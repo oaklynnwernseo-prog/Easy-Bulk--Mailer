@@ -23,37 +23,48 @@ st.title("📧 Multi-Gmail Bulk Sender")
 st.write("Add multiple Gmail accounts and switch anytime.")
 
 # -----------------------------------
-# SESSION STORAGE
+# SESSION STATE
 # -----------------------------------
 if "accounts" not in st.session_state:
     st.session_state.accounts = {}
 
-if "new_email" not in st.session_state:
-    st.session_state.new_email = ""
-
-if "new_pass" not in st.session_state:
-    st.session_state.new_pass = ""
+if "clear_inputs" not in st.session_state:
+    st.session_state.clear_inputs = False
 
 # -----------------------------------
-# ADD NEW ACCOUNT
+# CLEAR INPUTS SAFELY BEFORE WIDGETS
+# -----------------------------------
+default_email = ""
+default_pass = ""
+
+if st.session_state.clear_inputs:
+    st.session_state.clear_inputs = False
+else:
+    default_email = st.session_state.get("email_input", "")
+    default_pass = st.session_state.get("pass_input", "")
+
+# -----------------------------------
+# ADD ACCOUNT
 # -----------------------------------
 st.subheader("➕ Add Gmail Account")
 
-st.text_input(
+email_input = st.text_input(
     "Gmail Address",
-    key="new_email"
+    value=default_email,
+    key="email_input"
 )
 
-st.text_input(
+pass_input = st.text_input(
     "App Password",
     type="password",
-    key="new_pass"
+    value=default_pass,
+    key="pass_input"
 )
 
 if st.button("Add Account"):
 
-    email = st.session_state.new_email.strip()
-    password = st.session_state.new_pass.strip()
+    email = email_input.strip()
+    password = pass_input.strip()
 
     if email and password:
 
@@ -61,9 +72,8 @@ if st.button("Add Account"):
 
         st.success(f"Added: {email}")
 
-        # CLEAR INPUTS
-        st.session_state.new_email = ""
-        st.session_state.new_pass = ""
+        # Trigger clear on rerun
+        st.session_state.clear_inputs = True
 
         st.rerun()
 
@@ -92,11 +102,10 @@ selected_pass = st.session_state.accounts[selected_email]
 if st.button("❌ Remove Selected Account"):
 
     del st.session_state.accounts[selected_email]
-
     st.rerun()
 
 # -----------------------------------
-# EMAIL COMPOSER
+# COMPOSE EMAIL
 # -----------------------------------
 st.subheader("✉ Compose Email")
 
@@ -118,7 +127,7 @@ file = st.file_uploader(
 st.info("CSV format:\nemail\nabc@gmail.com")
 
 # -----------------------------------
-# SEND BUTTON
+# SEND EMAILS
 # -----------------------------------
 if st.button("🚀 Start Sending"):
 
@@ -134,9 +143,7 @@ if st.button("🚀 Start Sending"):
         st.error("Write email content")
         st.stop()
 
-    # -----------------------------------
-    # READ CSV SAFELY
-    # -----------------------------------
+    # READ CSV
     content = file.getvalue().decode(
         "utf-8",
         errors="ignore"
@@ -168,9 +175,7 @@ if st.button("🚀 Start Sending"):
 
     st.success(f"Total Emails: {len(emails)}")
 
-    # -----------------------------------
-    # LOGIN SMTP
-    # -----------------------------------
+    # SMTP LOGIN
     try:
         server = smtplib.SMTP(
             "smtp.gmail.com",
@@ -185,15 +190,13 @@ if st.button("🚀 Start Sending"):
         )
 
     except:
-        st.error("Login failed. Check Gmail/App Password.")
+        st.error("Login failed.")
         st.stop()
 
     progress = st.progress(0)
     sent = 0
 
-    # -----------------------------------
     # SEND LOOP
-    # -----------------------------------
     for i, receiver in enumerate(emails):
 
         msg = MIMEMultipart()
@@ -225,7 +228,6 @@ if st.button("🚀 Start Sending"):
             (i + 1) / len(emails)
         )
 
-        # 20–30 sec delay
         if i < len(emails) - 1:
             time.sleep(
                 random.randint(8, 10)
