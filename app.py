@@ -57,34 +57,31 @@ if st.button("Add Account"):
 
         st.session_state.accounts[email] = password
 
-        # CLEAR INPUT FIELDS
+        st.success("Account added successfully")
+
+        # Clear input fields after adding
         st.session_state.email_input = ""
         st.session_state.pass_input = ""
 
-        st.success("Account Added")
         st.rerun()
 
     else:
         st.warning("Enter email and password")
 
 # -----------------------------------
-# CHECK ACCOUNT
+# DROPDOWN
 # -----------------------------------
+st.subheader("🔁 Select Gmail Account")
+
 if len(st.session_state.accounts) == 0:
-    st.info("Add at least one Gmail account.")
+    st.info("Add Gmail account first.")
     st.stop()
 
-# -----------------------------------
-# DROPDOWN LABEL FIX
-# -----------------------------------
-st.subheader("🔁 Select Sender Account")
-
-emails = list(st.session_state.accounts.keys())
+email_list = list(st.session_state.accounts.keys())
 
 selected_email = st.selectbox(
-    "Email List",
-    options=emails,
-    index=0
+    "Saved Email List",
+    email_list
 )
 
 selected_pass = st.session_state.accounts[selected_email]
@@ -95,6 +92,7 @@ selected_pass = st.session_state.accounts[selected_email]
 if st.button("❌ Remove Selected Account"):
 
     del st.session_state.accounts[selected_email]
+
     st.rerun()
 
 # -----------------------------------
@@ -113,9 +111,11 @@ html_message = st_quill(
 # CSV UPLOAD
 # -----------------------------------
 file = st.file_uploader(
-    "Upload CSV (email column only)",
+    "Upload CSV (ONLY email column)",
     type=["csv"]
 )
+
+st.info("CSV format:\nemail\nabc@gmail.com")
 
 # -----------------------------------
 # SEND
@@ -123,7 +123,7 @@ file = st.file_uploader(
 if st.button("🚀 Start Sending"):
 
     if file is None:
-        st.error("Upload CSV file")
+        st.error("Upload CSV first")
         st.stop()
 
     if not subject:
@@ -134,7 +134,7 @@ if st.button("🚀 Start Sending"):
         st.error("Write email content")
         st.stop()
 
-    # READ CSV
+    # Read CSV
     content = file.getvalue().decode(
         "utf-8",
         errors="ignore"
@@ -153,10 +153,10 @@ if st.button("🚀 Start Sending"):
     )
 
     if len(df.columns) != 1 or df.columns[0] != "email":
-        st.error("CSV must contain email column only")
+        st.error("CSV must contain ONLY email column")
         st.stop()
 
-    emails_to_send = (
+    emails = (
         df["email"]
         .dropna()
         .astype(str)
@@ -164,7 +164,9 @@ if st.button("🚀 Start Sending"):
         .tolist()
     )
 
-    # SMTP LOGIN
+    st.success(f"Total Emails: {len(emails)}")
+
+    # SMTP Login
     try:
         server = smtplib.SMTP(
             "smtp.gmail.com",
@@ -185,10 +187,10 @@ if st.button("🚀 Start Sending"):
     progress = st.progress(0)
     sent = 0
 
-    # SEND LOOP
-    for i, receiver in enumerate(emails_to_send):
+    for i, receiver in enumerate(emails):
 
         msg = MIMEMultipart()
+
         msg["From"] = selected_email
         msg["To"] = receiver
         msg["Subject"] = subject
@@ -214,16 +216,16 @@ if st.button("🚀 Start Sending"):
             st.error(f"Failed → {receiver}")
 
         progress.progress(
-            (i + 1) / len(emails_to_send)
+            (i + 1) / len(emails)
         )
 
-        if i < len(emails_to_send) - 1:
+        if i < len(emails) - 1:
             time.sleep(
-                random.randint(20, 30)
+                random.randint(8, 10)
             )
 
     server.quit()
 
     st.success(
-        f"Done! Sent {sent}/{len(emails_to_send)}"
+        f"🎉 Done! Sent {sent}/{len(emails)} emails"
     )
