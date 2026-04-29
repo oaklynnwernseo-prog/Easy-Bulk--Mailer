@@ -20,42 +20,71 @@ st.set_page_config(
 
 st.title("📧 Multi-Gmail Bulk Sender")
 
-st.write("Use multiple Gmail accounts and switch anytime.")
-
 # -----------------------------------
-# SESSION STORAGE
+# SESSION STATE
 # -----------------------------------
 if "accounts" not in st.session_state:
     st.session_state.accounts = {}
 
+if "email_input" not in st.session_state:
+    st.session_state.email_input = ""
+
+if "pass_input" not in st.session_state:
+    st.session_state.pass_input = ""
+
 # -----------------------------------
-# ADD NEW ACCOUNT
+# ADD ACCOUNT
 # -----------------------------------
 st.subheader("➕ Add Gmail Account")
 
-new_email = st.text_input("Gmail Address")
-new_pass = st.text_input("App Password", type="password")
+st.text_input(
+    "Gmail Address",
+    key="email_input"
+)
+
+st.text_input(
+    "App Password",
+    type="password",
+    key="pass_input"
+)
 
 if st.button("Add Account"):
 
-    if new_email and new_pass:
-        st.session_state.accounts[new_email] = new_pass
-        st.success(f"Added: {new_email}")
+    email = st.session_state.email_input.strip()
+    password = st.session_state.pass_input.strip()
+
+    if email and password:
+
+        st.session_state.accounts[email] = password
+
+        # CLEAR INPUT FIELDS
+        st.session_state.email_input = ""
+        st.session_state.pass_input = ""
+
+        st.success("Account Added")
+        st.rerun()
+
     else:
         st.warning("Enter email and password")
 
 # -----------------------------------
-# SELECT ACCOUNT
+# CHECK ACCOUNT
 # -----------------------------------
-st.subheader("🔁 Select Gmail Account")
-
 if len(st.session_state.accounts) == 0:
-    st.info("Add at least one Gmail account first.")
+    st.info("Add at least one Gmail account.")
     st.stop()
 
+# -----------------------------------
+# DROPDOWN LABEL FIX
+# -----------------------------------
+st.subheader("🔁 Select Sender Account")
+
+emails = list(st.session_state.accounts.keys())
+
 selected_email = st.selectbox(
-    "Choose Sender Gmail",
-    list(st.session_state.accounts.keys())
+    "Email List",
+    options=emails,
+    index=0
 )
 
 selected_pass = st.session_state.accounts[selected_email]
@@ -64,18 +93,19 @@ selected_pass = st.session_state.accounts[selected_email]
 # REMOVE ACCOUNT
 # -----------------------------------
 if st.button("❌ Remove Selected Account"):
+
     del st.session_state.accounts[selected_email]
     st.rerun()
 
 # -----------------------------------
-# EMAIL INPUTS
+# EMAIL COMPOSE
 # -----------------------------------
 st.subheader("✉ Compose Email")
 
-subject = st.text_input("Email Subject")
+subject = st.text_input("Subject")
 
 html_message = st_quill(
-    placeholder="Write your email here...",
+    placeholder="Write email here...",
     html=True
 )
 
@@ -83,11 +113,9 @@ html_message = st_quill(
 # CSV UPLOAD
 # -----------------------------------
 file = st.file_uploader(
-    "Upload CSV (ONLY email column)",
+    "Upload CSV (email column only)",
     type=["csv"]
 )
-
-st.info("CSV format:\nemail\nabc@gmail.com")
 
 # -----------------------------------
 # SEND
@@ -95,7 +123,7 @@ st.info("CSV format:\nemail\nabc@gmail.com")
 if st.button("🚀 Start Sending"):
 
     if file is None:
-        st.error("Upload CSV first")
+        st.error("Upload CSV file")
         st.stop()
 
     if not subject:
@@ -106,9 +134,7 @@ if st.button("🚀 Start Sending"):
         st.error("Write email content")
         st.stop()
 
-    # -----------------------------------
     # READ CSV
-    # -----------------------------------
     content = file.getvalue().decode(
         "utf-8",
         errors="ignore"
@@ -127,10 +153,10 @@ if st.button("🚀 Start Sending"):
     )
 
     if len(df.columns) != 1 or df.columns[0] != "email":
-        st.error("CSV must contain ONLY email column")
+        st.error("CSV must contain email column only")
         st.stop()
 
-    emails = (
+    emails_to_send = (
         df["email"]
         .dropna()
         .astype(str)
@@ -138,11 +164,7 @@ if st.button("🚀 Start Sending"):
         .tolist()
     )
 
-    st.success(f"Total Emails: {len(emails)}")
-
-    # -----------------------------------
-    # LOGIN SMTP
-    # -----------------------------------
+    # SMTP LOGIN
     try:
         server = smtplib.SMTP(
             "smtp.gmail.com",
@@ -157,16 +179,14 @@ if st.button("🚀 Start Sending"):
         )
 
     except:
-        st.error("Login failed.")
+        st.error("Login failed")
         st.stop()
 
     progress = st.progress(0)
     sent = 0
 
-    # -----------------------------------
     # SEND LOOP
-    # -----------------------------------
-    for i, receiver in enumerate(emails):
+    for i, receiver in enumerate(emails_to_send):
 
         msg = MIMEMultipart()
         msg["From"] = selected_email
@@ -194,17 +214,16 @@ if st.button("🚀 Start Sending"):
             st.error(f"Failed → {receiver}")
 
         progress.progress(
-            (i + 1) / len(emails)
+            (i + 1) / len(emails_to_send)
         )
 
-        # Delay
-        if i < len(emails) - 1:
+        if i < len(emails_to_send) - 1:
             time.sleep(
-                random.randint(8, 10)
+                random.randint(20, 30)
             )
 
     server.quit()
 
     st.success(
-        f"🎉 Done! Sent {sent}/{len(emails)} emails"
+        f"Done! Sent {sent}/{len(emails_to_send)}"
     )
