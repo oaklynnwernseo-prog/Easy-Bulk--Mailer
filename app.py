@@ -20,48 +20,50 @@ st.set_page_config(
 
 st.title("📧 Multi-Gmail Bulk Sender")
 
+st.write("Add multiple Gmail accounts and switch anytime.")
+
 # -----------------------------------
-# SESSION STATE
+# SESSION STORAGE
 # -----------------------------------
 if "accounts" not in st.session_state:
     st.session_state.accounts = {}
 
-if "email_input" not in st.session_state:
-    st.session_state.email_input = ""
+if "new_email" not in st.session_state:
+    st.session_state.new_email = ""
 
-if "pass_input" not in st.session_state:
-    st.session_state.pass_input = ""
+if "new_pass" not in st.session_state:
+    st.session_state.new_pass = ""
 
 # -----------------------------------
-# ADD ACCOUNT
+# ADD NEW ACCOUNT
 # -----------------------------------
 st.subheader("➕ Add Gmail Account")
 
 st.text_input(
     "Gmail Address",
-    key="email_input"
+    key="new_email"
 )
 
 st.text_input(
     "App Password",
     type="password",
-    key="pass_input"
+    key="new_pass"
 )
 
 if st.button("Add Account"):
 
-    email = st.session_state.email_input.strip()
-    password = st.session_state.pass_input.strip()
+    email = st.session_state.new_email.strip()
+    password = st.session_state.new_pass.strip()
 
     if email and password:
 
         st.session_state.accounts[email] = password
 
-        st.success("Account added successfully")
+        st.success(f"Added: {email}")
 
-        # Clear input fields after adding
-        st.session_state.email_input = ""
-        st.session_state.pass_input = ""
+        # CLEAR INPUTS
+        st.session_state.new_email = ""
+        st.session_state.new_pass = ""
 
         st.rerun()
 
@@ -69,19 +71,17 @@ if st.button("Add Account"):
         st.warning("Enter email and password")
 
 # -----------------------------------
-# DROPDOWN
+# ACCOUNT SELECTOR
 # -----------------------------------
 st.subheader("🔁 Select Gmail Account")
 
 if len(st.session_state.accounts) == 0:
-    st.info("Add Gmail account first.")
+    st.info("Add at least one Gmail account first.")
     st.stop()
 
-email_list = list(st.session_state.accounts.keys())
-
 selected_email = st.selectbox(
-    "Saved Email List",
-    email_list
+    "Choose Sender Gmail",
+    list(st.session_state.accounts.keys())
 )
 
 selected_pass = st.session_state.accounts[selected_email]
@@ -96,14 +96,14 @@ if st.button("❌ Remove Selected Account"):
     st.rerun()
 
 # -----------------------------------
-# EMAIL COMPOSE
+# EMAIL COMPOSER
 # -----------------------------------
 st.subheader("✉ Compose Email")
 
-subject = st.text_input("Subject")
+subject = st.text_input("Email Subject")
 
 html_message = st_quill(
-    placeholder="Write email here...",
+    placeholder="Write your email here...",
     html=True
 )
 
@@ -118,7 +118,7 @@ file = st.file_uploader(
 st.info("CSV format:\nemail\nabc@gmail.com")
 
 # -----------------------------------
-# SEND
+# SEND BUTTON
 # -----------------------------------
 if st.button("🚀 Start Sending"):
 
@@ -134,7 +134,9 @@ if st.button("🚀 Start Sending"):
         st.error("Write email content")
         st.stop()
 
-    # Read CSV
+    # -----------------------------------
+    # READ CSV SAFELY
+    # -----------------------------------
     content = file.getvalue().decode(
         "utf-8",
         errors="ignore"
@@ -166,7 +168,9 @@ if st.button("🚀 Start Sending"):
 
     st.success(f"Total Emails: {len(emails)}")
 
-    # SMTP Login
+    # -----------------------------------
+    # LOGIN SMTP
+    # -----------------------------------
     try:
         server = smtplib.SMTP(
             "smtp.gmail.com",
@@ -181,16 +185,18 @@ if st.button("🚀 Start Sending"):
         )
 
     except:
-        st.error("Login failed")
+        st.error("Login failed. Check Gmail/App Password.")
         st.stop()
 
     progress = st.progress(0)
     sent = 0
 
+    # -----------------------------------
+    # SEND LOOP
+    # -----------------------------------
     for i, receiver in enumerate(emails):
 
         msg = MIMEMultipart()
-
         msg["From"] = selected_email
         msg["To"] = receiver
         msg["Subject"] = subject
@@ -219,6 +225,7 @@ if st.button("🚀 Start Sending"):
             (i + 1) / len(emails)
         )
 
+        # 20–30 sec delay
         if i < len(emails) - 1:
             time.sleep(
                 random.randint(8, 10)
